@@ -107,7 +107,7 @@
       .then(function (position) {
         return [position.coords.longitude, position.coords.latitude];
       });
-    var jsonData = $.getJSON('../3_json_export/dogparks1.geojson')
+    var jsonData = $.getJSON('./3_json_export/dogparks.geojson')
       .fail(handleError)
       .then(function (jqXHR) { return jqXHR; });
 
