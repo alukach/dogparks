@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=utf-8 />
+  <title>A simple map</title>
+  <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+  <script src='//api.tiles.mapbox.com/mapbox.js/v2.1.5/mapbox.js'></script>
+  <script src='//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js'></script>
+  <script src='//api.tiles.mapbox.com/mapbox.js/plugins/turf/v1.3.0/turf.min.js'></script>
+  <link href='//api.tiles.mapbox.com/mapbox.js/v2.1.5/mapbox.css' rel='stylesheet' />
+  <style>
+    body { margin:0; padding:0; }
+    #map { position:absolute; top:0; bottom:0; width:100%; }
+  </style>
+</head>
+<body>
+  <div id='map'></div>
+  <script src='account.js'></script>
+  <script>
+  var map = L.mapbox.map('map', 'examples.map-i86nkdio')
+    .setView([51.0402, -114.0234], 12);
+
+  // Load GeoJSON Data
+  function addDataToMap(data){
+    L.geoJson(data)
+      .addTo(map);
+  }
+
+  // Get user's location
+  function getLocation() {
+    if (navigator.geolocation) {
+      var deferred = $.Deferred();
+
+      navigator.geolocation.getCurrentPosition(
+        deferred.resolve,
+        deferred.reject
+      );
+
+        return deferred.promise();
+      } else {
+        // TODO: Handle error better
+        x.innerHTML = "Geolocation is not supported by this browser.";
+      }
+    }
+
+  // Add user location to map
+  function createMarker(long_lat) {
+    L.mapbox.featureLayer({
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: long_lat
+      },
+      properties: {
+        title: 'Your Location',
+        'marker-size': 'small',
+        'marker-color': '#BE9A6B',
+        // 'marker-symbol': 'marker-stroked'
+      }
+    }).addTo(map);
+  }
+
+  function panTo(long_lat) {
+    map.panTo([long_lat[1], long_lat[0]]);
+  }
+
+  var nearest_fc;
+  function getNearest(long_lat, jsonData) {
+    var local_pt = turf.point(long_lat);
+
+    // Itterate through polygons, finding neareset point
+    for (i = 0; i < jsonData.features.length; i++) {
+      var feature = jsonData.features[i];
+
+      try {
+        var fc_pts = turf.explode(feature);
+      }
+      catch (err) {
+        // Not sure why so many errors on this...
+        console.error(err);
+        console.error(feature);
+      }
+
+      var nearest_pt = turf.nearest(local_pt, fc_pts);
+      var distance = turf.distance(local_pt, nearest_pt, 'kilometers');
+      feature.properties.distance = distance;
+
+      // Set nearest
+      nearest_fc = nearest_fc || feature;
+      if (feature.properties.distance < nearest_fc.properties.distance) {
+        nearest_fc = feature;
+      }
+    }
+    var nearest = L.mapbox.featureLayer(nearest_fc)
+      .setStyle({color: '#F00'})
+      .addTo(map);
+    map.fitBounds(nearest.getBounds());
+  }
+
+  function handleError(err) {
+    console.warn('ERROR(' + err.code + '): ' + err.message);
+  };
+
+  $(function () {
+    var location = getLocation()
+      .fail(handleError)
+      .then(function (position) {
+        return [position.coords.longitude, position.coords.latitude];
+      });
+    var jsonData = $.getJSON('../3_json_export/dogparks1.geojson')
+      .fail(handleError)
+      .then(function (jqXHR) { return jqXHR; });
+
+    $.when(location)
+      .then(createMarker);
+
+    $.when(location)
+      .then(panTo);
+
+    $.when(jsonData)
+      .then(addDataToMap);
+
+    $.when(location, jsonData)
+      .done(getNearest);
+
+  });
+
+  </script>
+</body>
+</html>
