@@ -22,8 +22,13 @@
 
   // Load GeoJSON Data
   function addDataToMap(data){
-    L.geoJson(data)
+    var featureLayer = L.geoJson(data)
       .addTo(map);
+    featureLayer.eachLayer(function(layer) {
+      var content = '<h2>' + layer.feature.properties.NAME + '<\/h2>' +
+      '<address>Address: ' + layer.feature.properties.ADDRESS + '<\/address>';
+      layer.bindPopup(content);
+    });
   }
 
   // Get user's location
@@ -45,19 +50,7 @@
 
   // Add user location to map
   function createMarker(long_lat) {
-    L.mapbox.featureLayer({
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: long_lat
-      },
-      properties: {
-        title: 'Your Location',
-        'marker-size': 'small',
-        'marker-color': '#BE9A6B',
-        // 'marker-symbol': 'marker-stroked'
-      }
-    }).addTo(map);
+    L.marker([long_lat[1], long_lat[0]]).addTo(map);
   }
 
   function panTo(long_lat) {
@@ -77,8 +70,8 @@
       }
       catch (err) {
         // Not sure why so many errors on this...
-        console.error(err);
-        console.error(feature);
+        console.warn(err);
+        console.warn(feature);
       }
 
       var nearest_pt = turf.nearest(local_pt, fc_pts);
@@ -122,7 +115,6 @@
 
     $.when(location, jsonData)
       .done(getNearest);
-
   });
 
   </script>
