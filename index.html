@@ -2,11 +2,11 @@
 <html>
 <head>
   <meta charset=utf-8 />
-  <title>A simple map</title>
+  <title>Nearest Dogpark</title>
   <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
   <script src='//api.tiles.mapbox.com/mapbox.js/v2.1.5/mapbox.js'></script>
   <script src='//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js'></script>
-  <script src='//api.tiles.mapbox.com/mapbox.js/plugins/turf/v1.3.0/turf.min.js'></script>
+  <script src='//api.tiles.mapbox.com/mapbox.js/plugins/turf/v2.0.0/turf.min.js'></script>
   <link href='//api.tiles.mapbox.com/mapbox.js/v2.1.5/mapbox.css' rel='stylesheet' />
   <style>
     body { margin:0; padding:0; }
@@ -19,16 +19,12 @@
   <script>
   var map = L.mapbox.map('map', 'examples.map-i86nkdio')
     .setView([51.0402, -114.0234], 12);
+  var featureLayer;
 
   // Load GeoJSON Data
   function addDataToMap(data){
-    var featureLayer = L.geoJson(data)
+    featureLayer = L.geoJson(data)
       .addTo(map);
-    featureLayer.eachLayer(function(layer) {
-      var content = '<h2>' + layer.feature.properties.NAME + '<\/h2>' +
-      '<address>Address: ' + layer.feature.properties.ADDRESS + '<\/address>';
-      layer.bindPopup(content);
-    });
   }
 
   // Get user's location
@@ -57,37 +53,45 @@
     map.panTo([long_lat[1], long_lat[0]]);
   }
 
-  var nearest_fc;
-  function getNearest(long_lat, jsonData) {
-    var local_pt = turf.point(long_lat);
+  var nearest_fc, furthest_distance;
+  function getNearest(long_lat) {
+    var user_pt = turf.point(long_lat);  // User location
+    // Iterate through polygons
+    featureLayer.eachLayer(function(layer) {
 
-    // Itterate through polygons, finding neareset point
-    for (i = 0; i < jsonData.features.length; i++) {
-      var feature = jsonData.features[i];
-
-      try {
-        var fc_pts = turf.explode(feature);
-      }
-      catch (err) {
-        // Not sure why so many errors on this...
-        console.warn(err);
-        console.warn(feature);
-      }
-
-      var nearest_pt = turf.nearest(local_pt, fc_pts);
-      var distance = turf.distance(local_pt, nearest_pt, 'kilometers');
-      feature.properties.distance = distance;
+      // Find nearest point
+      var nearest_pt = turf.nearest(user_pt, turf.explode(layer.feature));
+      var distance = turf.distance(user_pt, nearest_pt, 'kilometers');
+      layer.feature.properties.distance = distance;
 
       // Set nearest
-      nearest_fc = nearest_fc || feature;
-      if (feature.properties.distance < nearest_fc.properties.distance) {
-        nearest_fc = feature;
+      nearest_fc = nearest_fc || layer;
+      if (distance < nearest_fc.feature.properties.distance) {
+        nearest_fc = layer;
+      } else
+      if (distance > furthest_distance) {
+        furthest_distance = distance;
       }
-    }
-    var nearest = L.mapbox.featureLayer(nearest_fc)
-      .setStyle({color: '#F00'})
-      .addTo(map);
-    map.fitBounds(nearest.getBounds());
+
+      // Append metadata
+      try {
+        var human_distance = Math.round(layer.feature.properties.distance * 100) / 100;
+        var content = '<h2>' + layer.feature.properties.NAME + '<\/h2>' +
+          '<address>Entrance: ' + layer.feature.properties.ADDRESS + '<\/address>' +
+          '<address>distance: ' + human_distance + 'KM<\/address>';
+        layer.bindPopup(content);
+      }
+      catch (err) {
+        console.warn(err);
+        console.warn(layer);
+        return
+      }
+    });
+    nearest_fc.setStyle({
+      fillColor: '#bd0026',
+    });
+    var bounds = nearest_fc.getBounds().extend(user_pt);
+    map.fitBounds(bounds);
   }
 
   function handleError(err) {
