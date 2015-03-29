@@ -23,7 +23,7 @@
       nearest_fc,
       furthest_distance,
       marker,
-      initialZoom;
+      initialZoom; // Has map been zoomed after load?
 
   // Load GeoJSON Data
   function addDataToMap(data){
@@ -53,7 +53,6 @@
     marker = L.marker([long_lat[1], long_lat[0]], {
       draggable: true,
     }).addTo(map);
-
     marker.on('drag', function(){
       getNearest();
     });
@@ -119,9 +118,12 @@
 
   $(function () {
     var location = getLocation()
-      .fail(handleError)
       .then(function (position) {
         return [position.coords.longitude, position.coords.latitude];
+      })
+      .fail(function(){
+        initialZoom = true;
+        return createMarker([-114.07147407531738, 51.04986591067927]);
       });
     var jsonData = $.getJSON('./3_json_export/dogparks.geojson')
       .fail(handleError)
