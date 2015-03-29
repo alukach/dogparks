@@ -19,7 +19,11 @@
   <script>
   var map = L.mapbox.map('map', 'examples.map-i86nkdio')
     .setView([51.0402, -114.0234], 12);
-  var featureLayer;
+  var featureLayer,
+      nearest_fc,
+      furthest_distance,
+      marker,
+      initialZoom;
 
   // Load GeoJSON Data
   function addDataToMap(data){
@@ -46,16 +50,23 @@
 
   // Add user location to map
   function createMarker(long_lat) {
-    L.marker([long_lat[1], long_lat[0]]).addTo(map);
+    marker = L.marker([long_lat[1], long_lat[0]], {
+      draggable: true,
+    }).addTo(map);
+
+    marker.on('drag', function(){
+      getNearest();
+    });
   }
 
   function panTo(long_lat) {
     map.panTo([long_lat[1], long_lat[0]]);
   }
 
-  var nearest_fc, furthest_distance;
-  function getNearest(long_lat) {
-    var user_pt = turf.point(long_lat);  // User location
+  function getNearest() {
+    var position = marker.getLatLng();
+    var user_pt = turf.point([position.lng, position.lat]);
+
     // Iterate through polygons
     featureLayer.eachLayer(function(layer) {
 
@@ -67,6 +78,9 @@
       // Set nearest
       nearest_fc = nearest_fc || layer;
       if (distance < nearest_fc.feature.properties.distance) {
+        nearest_fc.setStyle({
+          fillColor: null,
+        });
         nearest_fc = layer;
       } else
       if (distance > furthest_distance) {
@@ -90,8 +104,13 @@
     nearest_fc.setStyle({
       fillColor: '#bd0026',
     });
-    var bounds = nearest_fc.getBounds().extend(user_pt);
-    map.fitBounds(bounds);
+
+    // Only zoom on load
+    if (!initialZoom){
+      initialZoom = true;
+      var bounds = nearest_fc.getBounds().extend(user_pt);
+      map.fitBounds(bounds);
+    }
   }
 
   function handleError(err) {
